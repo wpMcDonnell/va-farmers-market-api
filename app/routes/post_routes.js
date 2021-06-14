@@ -3,7 +3,7 @@ const passport = require('passport')
 const multer = require('multer')
 const storage = multer.memoryStorage()
 const upload = multer({ storage })
-const Picture = require('../models/picture')
+const Post = require('../models/post')
 const User = require('../models/user')
 
 const requireToken = passport.authenticate('bearer', { session: false })
@@ -15,127 +15,127 @@ const router = express.Router()
 const s3Upload = require('../../lib/s3_upload')
 const removeBlanks = require('../../lib/remove_blank_fields')
 
-router.post('/vendors', requireToken, upload.single('picture'), (req, res, next) => {
+router.post('/vendors', requireToken, upload.single('post'), (req, res, next) => {
   console.log('this is my req.file when upload', req.file)
   console.log('this is my req.user when text', req.user)
   s3Upload(req.file)
     .then(awsFile => {
-      return Picture.create({ url: awsFile.Location, owner: req.user.id, title: req.body.title, market: req.body.market })
+      return Post.create({ url: awsFile.Location, owner: req.user.id, title: req.body.title, market: req.body.market })
     })
   //  req.body => { upload: { url: 'www.blank.com' } }
-    .then(pictureDoc => {
-      res.status(201).json({ picture: pictureDoc })
-      console.log('This is picdoc', pictureDoc)
+    .then(postDoc => {
+      res.status(201).json({ post: postDoc })
+      console.log('This is picdoc', postDoc)
     })
     .catch(next)
 })
 
-// this would just get picture data
+// this would just get post data
 // INDEX aka GET all
-router.get('/posts-pictures', requireToken, (req, res, next) => {
-  // find all pictures where the privacy of the owner is false
-  // if the owner is getting the pictures, show them their pictures as well
+router.get('/vendors', requireToken, (req, res, next) => {
+  // find all posts where the privacy of the owner is false
+  // if the owner is getting the posts, show them their posts as well
   console.log(req.user, 'my user')
-  Picture.find()
+  Post.find()
     .then(handle404)
-    .then(pictures => {
-      pictures = pictures.map(picture => picture.toObject())
-      return Promise.all(pictures.map(picture => {
-        return User.findById(picture.owner).then(owner => {
+    .then(posts => {
+      posts = posts.map(post => post.toObject())
+      return Promise.all(posts.map(post => {
+        return User.findById(post.owner).then(owner => {
           console.log(owner._id.toString(), req.user.id.toString())
           if (!owner.privacy || owner._id.toString() === req.user.id.toString()) {
-            picture.ownerName = owner.username
-            return picture
+            post.ownerName = owner.username
+            return post
           } else {
             return 'private'
           }
         })
       }))
-    }).then(pictures => {
-      console.log(pictures)
-      res.status(200).json({ pictures })
+    }).then(posts => {
+      console.log(posts)
+      res.status(200).json({ posts })
     }).catch(next)
 })
 
-router.get('/posts-pictures', (req, res, next) => {
-  // find all pictures where the privacy of the owner is false
-  // if the owner is getting the pictures, show them their pictures as well
-  Picture.find()
+router.get('/vendors', (req, res, next) => {
+  // find all posts where the privacy of the owner is false
+  // if the owner is getting the posts, show them their posts as well
+  Post.find()
     .then(handle404)
-    .then(pictures => {
-      pictures = pictures.map(picture => picture.toObject())
-      return Promise.all(pictures.map(picture => {
-        return User.findById(picture.owner).then(owner => {
+    .then(posts => {
+      posts = posts.map(post => post.toObject())
+      return Promise.all(posts.map(post => {
+        return User.findById(post.owner).then(owner => {
           console.log(owner._id.toString())
           if (!owner.privacy) {
-            picture.ownerName = owner.username
-            return picture
+            post.ownerName = owner.username
+            return post
           } else {
             return 'private'
           }
         })
       }))
-    }).then(pictures => {
-      console.log(pictures)
-      res.status(200).json({ pictures })
+    }).then(posts => {
+      console.log(posts)
+      res.status(200).json({ posts })
     }).catch(next)
 })
 
 //
 // INDEX aka GET all
 // router.get('/home', requireToken, (req, res, next) => {
-//   Picture.find({ owner: req.user.id })
+//   Post.find({ owner: req.user.id })
 //     .then(handle404)
-//     .then(pictures => {
-//       pictures = pictures.map(picture => picture.toObject())
-//       return Promise.all(pictures.map(picture => {
-//         return User.findById(picture.owner).then(owner => {
-//           picture.ownerName = owner.usernamecol
-//           return picture
+//     .then(posts => {
+//       posts = posts.map(post => post.toObject())
+//       return Promise.all(posts.map(post => {
+//         return User.findById(post.owner).then(owner => {
+//           post.ownerName = owner.usernamecol
+//           return post
 //         })
 //       }))
-//     }).then(pictures => {
-//       res.status(200).json({ pictures })
+//     }).then(posts => {
+//       res.status(200).json({ posts })
 //     }).catch(next)
 // })
 
 // // SHOW aka get by id
-router.get('/posts-pictures/:id', (req, res, next) => {
-  Picture.findById(req.params.id)
+router.get('/vendors/:id', (req, res, next) => {
+  Post.findById(req.params.id)
     .then(handle404)
-    .then(picture => picture.toObject())
-    .then(picture => User.findById(picture.owner)
+    .then(post => post.toObject())
+    .then(post => User.findById(post.owner)
       .then(owner => {
-        picture.ownerName = owner.username
-        return picture
+        post.ownerName = owner.username
+        return post
       })
-      .then(picture => {
-        res.status(200).json({ picture: picture })
+      .then(post => {
+        res.status(200).json({ post: post })
       })
     )
     .catch(next)
 })
 
-// // UPDATE picture caption
-router.patch('/posts-pictures/:id', removeBlanks, (req, res, next) => {
-  delete req.body.picture.owner
-  Picture.findById(req.params.id)
+// // UPDATE post caption
+router.patch('/vendors/:id', removeBlanks, (req, res, next) => {
+  delete req.body.post.owner
+  Post.findById(req.params.id)
     .then(handle404)
-    .then(picture => {
-      // requireOwnership(req, picture)
-      return picture.updateOne(req.body.picture)
+    .then(post => {
+      // requireOwnership(req, post)
+      return post.updateOne(req.body.post)
     })
     .then(() => res.sendStatus(204))
     .catch(next)
 })
 // DELETE
-router.delete('/posts-pictures/:id', requireToken, (req, res, next) => {
-  Picture.findById(req.params.id)
+router.delete('/vendors/:id', requireToken, (req, res, next) => {
+  Post.findById(req.params.id)
     .then(handle404)
-    .then(picture => {
-      requireOwnership(req, picture)
-      picture.deleteOne()
-      Picture.deleteOne()
+    .then(post => {
+      requireOwnership(req, post)
+      post.deleteOne()
+      Post.deleteOne()
     })
     .then(() => res.sendStatus(204))
     .catch(next)
